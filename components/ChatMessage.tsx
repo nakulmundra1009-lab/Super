@@ -1,0 +1,125 @@
+
+import React, { useState } from 'react';
+import type { Message } from '../types';
+import { Role } from '../types';
+
+interface ChatMessageProps {
+  message: Message;
+}
+
+const LoadingIndicator: React.FC = () => (
+    <div className="flex items-center space-x-1">
+        <div className="w-2 h-2 bg-slate-500 rounded-full animate-pulse [animation-delay:-0.3s]"></div>
+        <div className="w-2 h-2 bg-slate-500 rounded-full animate-pulse [animation-delay:-0.15s]"></div>
+        <div className="w-2 h-2 bg-slate-500 rounded-full animate-pulse"></div>
+    </div>
+);
+
+const CodeBlock: React.FC<{ language: string; code: string }> = ({ language, code }) => {
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+      alert('Failed to copy code to clipboard.');
+    }
+  };
+
+  return (
+    <div className="bg-slate-800 rounded-lg my-2 overflow-hidden">
+      <div className="flex justify-between items-center px-4 py-1.5 bg-slate-900 text-slate-300 text-xs font-sans">
+        <span>{language || 'code'}</span>
+        <button
+          onClick={handleCopy}
+          className="text-slate-300 hover:text-white transition-colors duration-200 text-xs flex items-center gap-1.5"
+          aria-label="Copy code"
+        >
+          {isCopied ? (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+              Copied!
+            </>
+          ) : (
+             <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                Copy
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="p-4 text-sm text-slate-100 overflow-x-auto font-mono">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
+
+const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+  const isAssistant = message.role === Role.ASSISTANT;
+
+  const containerClasses = isAssistant
+    ? 'flex items-start space-x-4'
+    : 'flex items-start justify-end space-x-4';
+    
+  const bubbleClasses = isAssistant
+    ? 'bg-white text-slate-700 rounded-r-xl rounded-bl-xl shadow-sm'
+    : 'bg-teal-600 text-white rounded-l-xl rounded-br-xl shadow-sm';
+
+  const avatarClasses = isAssistant
+    ? 'w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0'
+    : 'w-8 h-8 bg-slate-300 rounded-full flex items-center justify-center text-slate-600 text-sm font-bold flex-shrink-0';
+
+  const Avatar = () => (
+    <div className={avatarClasses}>
+      {isAssistant ? 'A' : 'U'}
+    </div>
+  );
+  
+  const renderContent = (text: string) => {
+    if (!text.includes('```')) {
+      return text.split('\n').map((line, index) => (
+        <React.Fragment key={index}>
+          {line}
+          <br />
+        </React.Fragment>
+      ));
+    }
+
+    const parts = text.split(/(```(?:[\w-]+)?\n[\s\S]*?\n```)/g);
+    
+    return parts.map((part, index) => {
+      if (!part) return null;
+      const codeBlockMatch = part.match(/^```([\w-]+)?\n([\s\S]*?)\n```$/);
+      
+      if (codeBlockMatch) {
+        const language = codeBlockMatch[1] || '';
+        const code = codeBlockMatch[2].trim();
+        return <CodeBlock key={index} language={language} code={code} />;
+      } else {
+        return part.split('\n').map((line, i) => (
+          <React.Fragment key={`${index}-${i}`}>
+            {line}
+            {i < part.split('\n').length - 1 && <br />}
+          </React.Fragment>
+        ));
+      }
+    });
+  };
+
+  return (
+    <div className={containerClasses}>
+      {isAssistant && <Avatar />}
+      <div className={`p-4 max-w-2xl w-full ${bubbleClasses}`}>
+        {message.text === '...' ? <LoadingIndicator /> : renderContent(message.text)}
+      </div>
+      {!isAssistant && <Avatar />}
+    </div>
+  );
+};
+
+export default ChatMessage;
